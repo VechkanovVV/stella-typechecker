@@ -1,0 +1,12 @@
+language core;
+
+extend with
+  #unit-type;
+
+fn inc(nah : Nat) -> Nat {
+  return succ(nah);
+}
+
+fn main(u : Unit) -> Nat {
+  return inc(0);
+}

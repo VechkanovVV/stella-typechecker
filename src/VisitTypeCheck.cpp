@@ -1,5 +1,7 @@
 #include "VisitTypeCheck.h"
+#include "Context.h"
 #include <iostream>
+#include <utility>
 
 namespace Stella
 {
@@ -32,14 +34,51 @@ namespace Stella
 
     void VisitTypeCheck::visitAProgram(AProgram* a_program)
     {
-        /* Code For AProgram Goes Here */
+        env_ = std::make_shared<Context>();
+        env_->addScope();
 
-        if (a_program->languagedecl_)
-            a_program->languagedecl_->accept(this);
-        if (a_program->listextension_)
-            a_program->listextension_->accept(this);
-        if (a_program->listdecl_)
+        if (a_program->languagedecl_) a_program->languagedecl_->accept(this);
+        if (a_program->listextension_) a_program->listextension_->accept(this);
+        
+        if (a_program->listdecl_) {
+            for (auto decl : *a_program->listdecl_) {
+                if (auto f = dynamic_cast<DeclFun*>(decl)) {
+                    const std::string name = f->stellaident_;
+                    if (!f->listparamdecl_ || f->listparamdecl_->size() != 1) {
+                        typeError("ERROR_UNEXPECTED_TYPE_FOR_EXPRESSION", "function must have exactly one parameter");
+                    }
+
+                    auto param = dynamic_cast<AParamDecl*>(f->listparamdecl_->front());
+                    if (!param || !param->type_) {
+                        typeError("ERROR_UNEXPECTED_TYPE_FOR_EXPRESSION", "parameter must have explicit type");
+                    }
+
+                    param->accept(this);
+                    auto paramType = currentType_;
+
+                    auto* srt = dynamic_cast<SomeReturnType*>(f->returntype_);
+                    if (!srt || !srt->type_) {
+                         typeError("ERROR_UNEXPECTED_TYPE_FOR_EXPRESSION", "missing return type");
+                    }
+                    
+                    srt->type_->accept(this);
+                    auto retTy = currentType_;
+
+                    ListType* listTypePtr = new ListType();
+                    listTypePtr->push_back(paramType.get()); 
+                    auto funcType = std::make_shared<TypeFun>(listTypePtr, retTy.get());
+                    env_->bindNew(name, funcType);
+                }
+            }
+        }
+
+        if (!env_->lookup("main")) {
+            typeError("ERROR_MISSING_MAIN", "program has no main");
+        }
+
+        if (a_program->listdecl_) {
             a_program->listdecl_->accept(this);
+        }
     }
 
     void VisitTypeCheck::visitLanguageCore(LanguageCore* language_core)
@@ -57,13 +96,17 @@ namespace Stella
 
     void VisitTypeCheck::visitDeclFun(DeclFun* decl_fun)
     {
-        /* Code For DeclFun Goes Here */
+        env_->addScope();
 
-        if (decl_fun->listannotation_)
+        if (decl_fun->listannotation_) {
             decl_fun->listannotation_->accept(this);
+        }
+        
         visitStellaIdent(decl_fun->stellaident_);
-        if (decl_fun->listparamdecl_)
+        if (decl_fun->listparamdecl_) {
             decl_fun->listparamdecl_->accept(this);
+
+        }
         if (decl_fun->returntype_)
             decl_fun->returntype_->accept(this);
         if (decl_fun->throwtype_)
@@ -72,6 +115,8 @@ namespace Stella
             decl_fun->listdecl_->accept(this);
         if (decl_fun->expr_)
             decl_fun->expr_->accept(this);
+
+        env_->popScope();
     }
 
     void VisitTypeCheck::visitDeclTypeAlias(DeclTypeAlias* decl_type_alias)
@@ -177,10 +222,11 @@ namespace Stella
     void VisitTypeCheck::visitAParamDecl(AParamDecl* a_param_decl)
     {
         /* Code For AParamDecl Goes Here */
-
+        std::cout << "Kek: " << a_param_decl->stellaident_ << std::endl;
         visitStellaIdent(a_param_decl->stellaident_);
         if (a_param_decl->type_)
             a_param_decl->type_->accept(this);
+        env_->bindNew(a_param_decl->stellaident_, currentType_);
     }
 
     void VisitTypeCheck::visitNoReturnType(NoReturnType* no_return_type)
@@ -272,17 +318,17 @@ namespace Stella
 
     void VisitTypeCheck::visitTypeBool(TypeBool* type_bool)
     {
-        /* Code For TypeBool Goes Here */
+       currentType_ = std::make_shared<TypeBool>();
     }
 
     void VisitTypeCheck::visitTypeNat(TypeNat* type_nat)
     {
-        /* Code For TypeNat Goes Here */
+        currentType_ = std::make_shared<TypeNat>();
     }
 
     void VisitTypeCheck::visitTypeUnit(TypeUnit* type_unit)
     {
-        /* Code For TypeUnit Goes Here */
+        currentType_ = std::make_shared<TypeUnit>();
     }
 
     void VisitTypeCheck::visitTypeTop(TypeTop* type_top)
@@ -485,14 +531,28 @@ namespace Stella
 
     void VisitTypeCheck::visitIf(If* if_)
     {
-        /* Code For If Goes Here */
-
-        if (if_->expr_1)
+        //condition
+        if (if_->expr_1) {
             if_->expr_1->accept(this);
-        if (if_->expr_2)
-            if_->expr_2->accept(this);
-        if (if_->expr_3)
-            if_->expr_3->accept(this);
+            if (!dynamic_cast<TypeBool*>(currentType_.get())) {
+                typeError("ERROR_UNEXPECTED_TYPE_FOR_EXPRESSION", "if condition must be Bool");
+            }
+        }
+
+        if (!if_->expr_2 || !if_->expr_3) {
+            typeError("ERROR_UNEXPECTED_TYPE_FOR_EXPRESSION", "if must have both branches");
+        }
+
+        if_->expr_2->accept(this);
+        auto thenType = std::move(currentType_);
+        if_->expr_3->accept(this);
+        auto elseType = std::move(currentType_);
+
+        if (!typeEquals(thenType, elseType)) {
+            typeError("ERROR_UNEXPECTED_TYPE_FOR_EXPRESSION", "then/selde branch type mismatch");
+        }
+        
+        currentType_ = thenType;
     }
 
     void VisitTypeCheck::visitLet(Let* let)
@@ -693,11 +753,21 @@ namespace Stella
     }
 
     void VisitTypeCheck::visitApplication(Application* application)
-    {
-        /* Code For Application Goes Here */
+    {   
+        std::cout << application->expr_->line_number << std::endl;
 
-        if (application->expr_)
+        if (application->expr_) {   
             application->expr_->accept(this);
+            if (!dynamic_cast<TypeFun*>(currentType_.get())) {
+                typeError("ERROR_NOT_A_FUNCTION", "Function was expected");
+            }
+        }
+
+        auto calleeType = currentType_; 
+        if (!application->listexpr_ || application->listexpr_->size() != 1) {
+            typeError("Functions with one parameter are supported");
+        }
+
         if (application->listexpr_)
             application->listexpr_->accept(this);
     }
@@ -790,8 +860,11 @@ namespace Stella
     {
         /* Code For Succ Goes Here */
 
-        if (succ->expr_)
+        if (succ->expr_) {
             succ->expr_->accept(this);
+            if (!dynamic_cast<TypeNat*>(currentType_.get())) typeError("ERROR_UNEXPECTED_TYPE_FOR_EXPRESSION", "Succ expects Nat");
+            currentType_ = std::make_shared<TypeNat>();
+        }
     }
 
     void VisitTypeCheck::visitLogicNot(LogicNot* logic_not)
@@ -812,10 +885,11 @@ namespace Stella
 
     void VisitTypeCheck::visitIsZero(IsZero* is_zero)
     {
-        /* Code For IsZero Goes Here */
-
-        if (is_zero->expr_)
+        if (is_zero->expr_) {
             is_zero->expr_->accept(this);
+            if (!dynamic_cast<TypeNat*>(currentType_.get())) typeError("ERROR_UNEXPECTED_TYPE_FOR_EXPRESSION", "IsZero expects Bool");
+            currentType_ = std::make_shared<TypeBool>();
+        }
     }
 
     void VisitTypeCheck::visitFix(Fix* fix)
@@ -860,17 +934,17 @@ namespace Stella
 
     void VisitTypeCheck::visitConstTrue(ConstTrue* const_true)
     {
-        /* Code For ConstTrue Goes Here */
+        currentType_ = std::make_shared<TypeBool>();
     }
 
     void VisitTypeCheck::visitConstFalse(ConstFalse* const_false)
     {
-        /* Code For ConstFalse Goes Here */
+        currentType_ = std::make_shared<TypeBool>();
     }
 
     void VisitTypeCheck::visitConstUnit(ConstUnit* const_unit)
     {
-        /* Code For ConstUnit Goes Here */
+        currentType_ = std::make_shared<TypeUnit>();
     }
 
     void VisitTypeCheck::visitConstInt(ConstInt* const_int)
@@ -878,6 +952,7 @@ namespace Stella
         /* Code For ConstInt Goes Here */
 
         visitInteger(const_int->integer_);
+        currentType_ = std::make_shared<TypeNat>();
     }
 
     void VisitTypeCheck::visitConstMemory(ConstMemory* const_memory)
@@ -889,9 +964,13 @@ namespace Stella
 
     void VisitTypeCheck::visitVar(Var* var)
     {
-        /* Code For Var Goes Here */
+        auto ty = env_->lookup(var->stellaident_);
 
-        visitStellaIdent(var->stellaident_);
+        if (!ty) {
+            typeError("ERROR_UNDEFINED_VARIABLE", "Variable " + var->stellaident_ + " does not exist");
+        }
+
+        currentType_ = ty;
     }
 
     void VisitTypeCheck::visitAPatternBinding(APatternBinding* a_pattern_binding)
@@ -982,6 +1061,7 @@ namespace Stella
 
     void VisitTypeCheck::visitListParamDecl(ListParamDecl* list_param_decl)
     {
+        //тут мы отсавляем как есть
         for (const auto& i : *list_param_decl)
         {
             i->accept(this);
@@ -1062,7 +1142,9 @@ namespace Stella
 
     void VisitTypeCheck::visitInteger(Integer x)
     {
-        /* Code for Integer Goes Here */
+        if (x != 0) {
+            typeError("ERROR_UNEXPECTED_TYPE_FOR_EXPRESSION", "ConstInt must to be 0");
+        }
     }
 
     void VisitTypeCheck::visitChar(Char x)
@@ -1150,4 +1232,62 @@ namespace Stella
         if (type_for_all->type_)
             type_for_all->type_->accept(this);
     }
+
+    [[noreturn]] void VisitTypeCheck::typeError(const char* tag, const std::string& msg)
+    {
+        if (msg.empty()) {
+            std::cerr << tag << '\n';
+        } else {
+            std::cerr << tag << ": " << msg << '\n';
+        }
+        std::exit(1);
+    }
+
+    bool VisitTypeCheck::typeEquals(std::shared_ptr<Type>& a, std::shared_ptr<Type>& b) {
+        if (!a || !b) return false;
+
+        //basic
+        if (dynamic_cast<TypeBool*>(a.get())) return dynamic_cast<TypeBool*>(b.get());
+        if (dynamic_cast<TypeNat*>(a.get())) return dynamic_cast<TypeNat*>(b.get());
+        if (dynamic_cast<TypeUnit*>(a.get())) return dynamic_cast<TypeUnit*>(b.get());
+
+        if (dynamic_cast<TypeFun*>(a.get())) return dynamic_cast<TypeFun*>(b.get());
+        if (dynamic_cast<TypeTuple*>(a.get())) return dynamic_cast<TypeTuple*>(b.get()); 
+
+        return false;
+    }
+
+    ///Context impl
+
+    std::unordered_map<std::string, std::shared_ptr<Type>>& Context::getTop() {
+        return scopes_.top();
+    }
+    
+    void Context::popScope() {
+        if (!scopes_.empty()) {
+            scopes_.pop();
+        }
+    }
+    void Context::addScope() {
+        if (scopes_.empty()) {
+            scopes_.push({});
+        } else {
+            auto parent = scopes_.top();
+            scopes_.push(parent);
+        }
+
+    }
+
+    void Context::bindNew(const std::string& name, std::shared_ptr<Type> stellaType) {
+        if (scopes_.empty()) throw "There is no scope";
+        scopes_.top()[name] = std::move(stellaType);
+    }
+
+    std::shared_ptr<Type> Context::lookup(const std::string& name) const {
+        if (scopes_.empty()) return nullptr;
+        const auto& top = scopes_.top();
+        auto it = top.find(name);
+        return it == top.end() ? nullptr : it->second;
+    }
+
 } // namespace Stella

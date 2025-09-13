@@ -1,5 +1,7 @@
 #pragma once
+#include "memory"
 #include "Stella/Absyn.H"
+#include "Context.h"
 
 namespace Stella
 {
@@ -171,5 +173,11 @@ namespace Stella
         void visitTryCastAs(TryCastAs* p) override;
         void visitPatternAsc(PatternAsc* p) override;
         void visitTypeAuto(TypeAuto* p) override;
+
+        std::shared_ptr<Type> currentType_;
+        std::shared_ptr<Expr> currentExpr_;
+        std::shared_ptr<Context> env_;
+        [[noreturn]] void typeError(const char* tag, const std::string& msg = "");
+        bool typeEquals(std::shared_ptr<Type>& a, std::shared_ptr<Type>& b);
     };
 } // namespace Stella
