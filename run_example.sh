@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
-
+clear
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 EX="$ROOT/example.stella"
 

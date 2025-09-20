@@ -1,30 +1,27 @@
-#include <iostream>
 #include "Eval.h"
+
+#include <iostream>
+
 #include "Stella/Absyn.H"
 
-namespace Stella
-{
-    Expr* eval(Expr* expr)
-    {
-        if (!expr)
-        {
-            return nullptr;
-        }
-
-        std::cout << "evaluator is not implemented!\n";
-
-        return expr;
+namespace Stella {
+Expr* eval(Expr* expr) {
+    if (!expr) {
+        return nullptr;
     }
 
-    Expr* evalMainWith(Program* prog, Expr* expr)
-    {
-        if (!expr)
-        {
-            return nullptr;
-        }
+    std::cout << "evaluator is not implemented!\n";
 
-        std::cout << "evaluator is not implemented!\n";
+    return expr;
+}
 
-        return expr;
+Expr* evalMainWith(Program* prog, Expr* expr) {
+    if (!expr) {
+        return nullptr;
     }
-} // namespace Stella
+
+    std::cout << "evaluator is not implemented!\n";
+
+    return expr;
+}
+}  // namespace Stella

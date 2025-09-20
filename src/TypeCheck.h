@@ -1,11 +1,10 @@
 #pragma once
 #include "Stella/Absyn.H"
 
-namespace Stella
-{
-    void typecheckProgram(Program* program);
+namespace Stella {
+void typecheckProgram(Program* program);
 
-    void typecheck(Expr* expr, Type* type);
+void typecheck(Expr* expr, Type* type);
 
-    Type* infer(Expr* expr);
-} // namespace Stella
+Type* infer(Expr* expr);
+}  // namespace Stella

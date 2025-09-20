@@ -1,0 +1,13 @@
+language core;
+
+extend with #panic;
+
+fn div(n : Nat) -> fn(Nat) -> Nat {
+  return fn(m : Nat) {
+    return if Nat::iszero(m) then panic! else m
+  };
+}
+
+fn main(n : Nat) -> Nat {
+  return div(n)(0);
+}

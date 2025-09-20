@@ -1,0 +1,8 @@
+language core;
+
+extend with #panic, #let-bindings;
+
+fn main(n : Nat) -> Nat {
+  // initializer position typically has no expected type -> panic! should be ambiguous
+  return let x = panic! in n
+}

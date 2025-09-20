@@ -1,8 +1,4 @@
-# Stella implementation in C++ (template)
-
-This is the skeleton for a C++ implementation of the Stella programming language interpreter.
-
-![Screenshot from VS Code.](images/vscode-demo.png)
+# Stella implementation in C++ 
 
 ### Requirements
 

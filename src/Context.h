@@ -1,14 +1,15 @@
 #pragma once
 
-#include <unordered_map>
 #include <memory>
-#include <string>
 #include <stack>
+#include <string>
+#include <unordered_map>
+
 #include "Stella/Absyn.H"
 
 namespace Stella {
 class Context {
-public:
+   public:
     Context() = default;
     Context(const Context&) = delete;
 
@@ -20,7 +21,7 @@ public:
     void popScope();
     std::unordered_map<std::string, std::shared_ptr<Type>>& getTop();
 
-private:
+   private:
     std::stack<std::unordered_map<std::string, std::shared_ptr<Type>>> scopes_;
 };
-}
+}  // namespace Stella

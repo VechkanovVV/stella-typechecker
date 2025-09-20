@@ -1,12 +1,11 @@
 language core;
 
-extend with
-  #unit-type;
+extend with #records;
 
-fn inc(nah : Nat) -> Nat {
-  return succ(nah);
+fn iterate(n : Nat) -> { current : Nat, next : Nat} {
+  return { current = n, next = succ(n) }
 }
 
-fn main(u : Unit) -> Nat {
-  return inc(0);
+fn main(n : Nat) -> Nat {
+  return iterate(0).next
 }
