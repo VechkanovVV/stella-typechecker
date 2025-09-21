@@ -1642,9 +1642,27 @@ void VisitTypeCheck::visitIsZero(IsZero* is_zero) {
 }
 
 void VisitTypeCheck::visitFix(Fix* fix) {
-    /* Code For Fix Goes Here */
+    if (!fix || !fix->expr_) typeError("ERROR_UNEXPECTED_TYPE_FOR_EXPRESSION", "invalid fix node");
 
-    if (fix->expr_) fix->expr_->accept(this);
+    fix->expr_->accept(this);
+    auto tf = currentType_ ? dynamic_cast<TypeFun*>(currentType_.get()) : nullptr;
+    if (!tf) {
+        typeError("ERROR_NOT_A_FUNCTION", "fix argument must be a function");
+    }
+    if (!tf->listtype_ || tf->listtype_->size() != 1) {
+        typeError("ERROR_UNEXPECTED_TYPE_FOR_EXPRESSION", "fix function must take exactly one parameter");
+    }
+
+    Type* param = (*tf->listtype_)[0];
+    Type* ret = tf->type_;
+    if (!param || !ret) {
+        typeError("ERROR_UNEXPECTED_TYPE_FOR_EXPRESSION", "invalid function type for fix");
+    }
+
+    if (!typeEquals(param, ret)) {
+        typeError("ERROR_UNEXPECTED_TYPE_FOR_EXPRESSION", "fix expects a function of type A -> A (parameter and result must match)");
+    }
+    currentType_ = std::shared_ptr<Type>(ret->clone());
 }
 
 void VisitTypeCheck::visitNatRec(NatRec* nat_rec) {
